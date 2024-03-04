@@ -1,0 +1,6 @@
+[theme]
+primaryColor = "#F39C12"  # A warm, sunrise-like orange for buttons and links
+backgroundColor = "#34495E"  # A deep blue, reminiscent of the early morning sky
+secondaryBackgroundColor = "#2C3E50"  # A slightly lighter shade of blue for the sidebar
+textColor = "#ECF0F1"  # Off-white for text, ensuring readability against the dark background
+font = "sans serif"  # A clean, modern font for general readability
