@@ -5,7 +5,7 @@ import os
 import time
 import random
 
-# code to config the page
+# Code to config the page
 st.set_page_config(
     page_icon="🌞")
 
@@ -168,7 +168,7 @@ def view_morning_routine_data():
 
 # App Pages: Nightly Survey Application
 def display_nightly_survey():
-    """"
+    """
     The nightly survey used to analyze the affect of the morning routine on the rest of their day.
     """
     st.header("Nightly Survey")
@@ -209,7 +209,7 @@ def display_nightly_survey():
 
 
 # Data Analysis part
-# In order to be able to analyze the data, we need to have numerical data
+# In order to be able to analyze the data, we need to have only numerical data
 def convert_responses_to_numeric(df):
     """
     We need to convert string data into numerical data for the correlation matrix.
@@ -281,45 +281,60 @@ def load_and_analyze_data():
         return None, None, None
 
 
+# Definition to display the consistency the user has in their morning routine
 def view_morning_routine_consistency():
     """
     Calculates and displays the consistency of completing each habit in the morning routine
     based on the current list of habits in the session state.
     """
     try:
+        # Load the morning routine data from a CSV file.
         df = pd.read_csv('morning_routine.csv')
+        # Convert the 'Date' column to datetime format for easier manipulation.
         df['Date'] = pd.to_datetime(df['Date']).dt.date
 
+        # Check if the DataFrame is not empty and the session state has a list of habits.
         if not df.empty and 'activities_list' in st.session_state:
+            # Count the unique dates to know over how many days tracking has occurred.
             total_days_tracked = df['Date'].nunique()
-            habits = st.session_state.activities_list  # Use the dynamic list of habits
+            # Retrieve the list of habits from the session state.
+            habits = st.session_state.activities_list
 
+            # Initialize a dictionary to store consistency percentages for each habit.
             habit_consistency = {}
             for habit in habits:
-                if habit in df.columns:  # Ensure habit was tracked
+                # Check if the habit has been tracked (exists as a column in the DataFrame).
+                if habit in df.columns:
+                    # Calculate the mean of each habit column and multiply by 100 for percentage.
                     habit_consistency[habit] = (df[habit].mean() * 100)
                 else:
-                    habit_consistency[habit] = 0.0  # Habit not tracked
+                    # If a habit hasn't been tracked, its consistency is 0%.
+                    habit_consistency[habit] = 0.0
 
-            # Display overall and individual habit consistencies
+            # Display the analysis header and the total number of days tracked.
             st.subheader("Morning Routine Consistency Analysis")
             st.write(f"Tracked over: {total_days_tracked} days")
 
+            # Calculate and display the overall consistency percentage.
             overall_consistency = sum(habit_consistency.values()) / len(habits) if habits else 0
             st.metric("Overall Consistency", f"{overall_consistency:.2f}%")
 
+            # Display the consistency percentage for each habit.
             for habit, consistency in habit_consistency.items():
                 st.metric(f"{habit} Consistency", f"{consistency:.2f}%")
 
+            # Provide feedback to the user based on the overall consistency.
             if overall_consistency < 60:
                 st.warning(
                     "Your morning routine consistency is below 60%. Consider being more consistent or adjusting your routine.")
             else:
                 st.success("Great job! You're maintaining a good consistency in your morning routine.")
         else:
+            # Show an error message if no data is found.
             st.error("No data found. Start tracking your morning routine to view consistency analysis.")
 
     except FileNotFoundError:
+        # Show an error message if the CSV file does not exist.
         st.error("Morning routine data file not found. Please ensure you've tracked your habits.")
 
 
@@ -331,16 +346,25 @@ def recommendation():
     """
     correlation_matrix, merged_df, analysis_period = load_and_analyze_data()
 
+    # Begin displaying the Recommendations section in the app interface
     st.write("## Recommendations:")
-    # Insight and Recommendation for Limiting Morning Phone Use
+
+    # Check if both 'Phone Usage' and 'Productivity' are present as columns in the correlation matrix
+    # This is to ensure that the analysis only proceeds if relevant data is available
     if 'Phone Usage' in correlation_matrix.columns and 'Productivity' in correlation_matrix.columns:
+        # Calculate the correlation coefficient between phone usage in the morning and productivity levels
         phone_usage_productivity_corr = correlation_matrix.loc['Phone Usage', 'Productivity']
+        # If the correlation is negative, it indicates that increased phone usage is associated with lower productivity
         if phone_usage_productivity_corr < 0:
+            # Present a specific recommendation to the user based on this finding
             st.subheader("Limit Morning Phone Use")
             st.write("""
-                            - **Recommendation**: Limit your phone usage during the first hour after waking up.
-                            - **Why**: There's a negative correlation between morning phone usage and productivity. Reducing early screen time may help you focus on your goals and lead to a more productive day.
-                            """)
+                    - **Recommendation**: Limit your phone usage during the first hour after waking up.
+                    - **Why**: Analysis has revealed a negative correlation between morning phone usage and productivity. 
+                               This suggests that reducing early screen time may help enhance your focus on daily goals 
+                               and lead to a more productive day. By limiting phone usage, you can avoid distractions and 
+                               potentially improve your overall productivity.
+                    """)
 
     if 'Affirmations' in correlation_matrix.columns and 'Routine Satisfaction' in correlation_matrix.columns:
         affirmations_satisfaction_corr = correlation_matrix.loc['Affirmations', 'Routine Satisfaction']
@@ -379,56 +403,75 @@ def recommendation():
                     """)
 
 
+# Definition analyzes how morning routine activities correlate to outcomes like mood and productivity
 def get_activity_outcome_correlations(correlation_matrix, activities, outcomes):
     """Extract correlations between specified activities and outcomes. Needed for the personalized insight"""
     correlations = {}
     for activity in activities:
         for outcome in outcomes:
+            # Check if both activity and outcome exist in the correlation matrix
             if activity in correlation_matrix.index and outcome in correlation_matrix.columns:
-                # Get the correlation value
+                # Extract the correlation coefficient between the activity and outcome
                 corr_value = correlation_matrix.at[activity, outcome]
-                # Store the correlation if it's significant
-                if pd.notnull(corr_value) and abs(corr_value) > 0.2:  # Example threshold for significance
+
+                # Only consider correlations that are significant (absolute value greater than 0.2)
+                if pd.notnull(corr_value) and abs(corr_value) > 0.2:
                     correlations[(activity, outcome)] = corr_value
     return correlations
 
 
+# Definition categorizes the correlation into positive and negative impacts
 def generate_categorized_recommendations(correlations):
     """Generate categorized recommendations based on the direction of correlations. Needed for the personalized insight"""
+    # Separate activities into those with positive and negative impacts based on correlation values
     positive_impacts = {pair: corr for pair, corr in correlations.items() if corr > 0}
     negative_impacts = {pair: corr for pair, corr in correlations.items() if corr < 0}
 
+    # Display activities with positive impacts and recommend continuing or increasing them
     if positive_impacts:
         st.write("### This Works for You")
         for (activity, outcome), corr_value in positive_impacts.items():
-            st.write(
-                f"- **{activity}** positively impacts your **{outcome}**. Keeping it up could further enhance your well-being.")
+            st.write(f"- **{activity}** positively impacts your **{outcome}**. "
+                     "Keeping it up could further enhance your well-being.")
 
+    # Display activities with negative impacts and suggest reconsideration or reduction
     if negative_impacts:
         st.write("### Improve This")
         for (activity, outcome), corr_value in negative_impacts.items():
-            st.write(
-                f"- **{activity}** might be hindering your **{outcome}**. Consider adjusting or reducing this activity to see improvements.")
+            st.write(f"- **{activity}** might be hindering your **{outcome}**. "
+                     "Consider adjusting or reducing this activity to see improvements.")
 
 
+# Definition to shows the personalized insights
 def show_personalized_insights():
     """Display personalized insights and recommendations based on the user's morning routine data."""
+    # Load the user data and perform analysis to get the correlation matrix and the period of analysis.
+    # This includes combining morning routine data with outcomes from the nightly survey.
     correlation_matrix, merged_df, analysis_period = load_and_analyze_data()
 
+    # Inform the user about the period over which the analysis is conducted.
     st.write(f"Analysis based on data from: {analysis_period}")
 
+    # A friendly greeting message to introduce the insights section.
     greeting = f"Good morning! Here's how to optimize your morning routine:"
     st.write(greeting)
 
-    # Define which columns are considered activities and which are outcomes
+    # Specifying which columns in the data are considered activities and which are considered outcomes.
+    # This helps focus the analysis on relevant aspects of the morning routine.
     activities = ['Drink Water', 'Exercise eg. Yoga', 'Meditate', 'Journal', 'Affirmations']
     outcomes = ['Energy Level', 'Mood', 'Routine Satisfaction']
 
+    # Calculate the correlations between specified activities and outcomes.
+    # This helps identify which activities have the most significant positive or negative impact on outcomes.
     correlations = get_activity_outcome_correlations(correlation_matrix, activities, outcomes)
+
+    # Present the calculated correlations in a categorized manner, highlighting activities
+    # that positively or negatively impact the user's well-being.
     generate_categorized_recommendations(correlations)
 
 
-def detailed_insghts():
+# Definition to display the really detailed insights
+def detailed_insights():
     """
     Provides very detailed insights because it shows the correlation numbers of the activities with the outcomes.
     """
@@ -441,18 +484,20 @@ def detailed_insghts():
     st.write("### Key Insights")
 
     for activity in activities:
-        if activity in correlation_matrix.index:  # Ensure activity is in the index of the correlation matrix
+        # Check if the activity is in the correlation matrix to ensure relevance.
+        if activity in correlation_matrix.index:
             for outcome in outcomes:
-                if outcome in correlation_matrix.columns:  # Check if the outcome column exists
+                # Ensure the outcome is also in the correlation matrix before analyzing.
+                if outcome in correlation_matrix.columns:
                     corr_value = correlation_matrix.at[activity, outcome]
-                    # Interpret and display the correlation in a user-friendly manner
+                    # Proceed only if the correlation value is valid (not null).
                     if pd.notnull(corr_value):
-                        if corr_value > 0.2:  # Example threshold for a positive correlation
-                            st.write(
-                                f"- **{activity}** positively correlates with **{outcome}** ({corr_value:.2f}). Consider incorporating it more into your routine.")
-                        elif corr_value < -0.2:  # Example threshold for a negative correlation
-                            st.write(
-                                f"- **{activity}** negatively correlates with **{outcome}** ({corr_value:.2f}). Reevaluate its place in your morning.")
+                        # Positive correlation suggests a beneficial impact of the activity.
+                        if corr_value > 0.2:
+                            st.write(f"- **{activity}** positively correlates with **{outcome}** ({corr_value:.2f}).")
+                        # Negative correlation suggests the activity might be adversely affecting the outcome.
+                        elif corr_value < -0.2:
+                            st.write(f"- **{activity}** negatively correlates with **{outcome}** ({corr_value:.2f}).")
 
 
 # Community Page
@@ -483,8 +528,10 @@ def community_page():
     with col2:
         display_user_box("Lisa", 30, "Send Motivation")
 
+    # Friend name input
     friend_name = st.text_input("Enter your friend's name:")
     if st.button("Send Friend Request", key="send_request"):
+        # If a name entered then success, if not warning
         if friend_name:
             st.success(f"Friend request sent to {friend_name}!")
         else:
@@ -495,6 +542,7 @@ def community_page():
 def reminders_page():
     st.header("Reminders")
 
+    # As an Easter Egg, some surprise compliments
     compliments = [
         "You're doing great!",
         "Keep up the amazing work!",
@@ -509,6 +557,7 @@ def reminders_page():
             "which is needed to complete the analysis and suggest personalized recommendations."
         )
 
+    # Submit the reminders, that displays the compliment as well
     with st.form("reminder_form"):
         st.time_input("Morning Routine Reminder", key="morning")
         st.time_input("Survey Reminder", key="survey")
@@ -518,7 +567,7 @@ def reminders_page():
             st.success(random.choice(compliments) + " 🌟")
 
 
-# Challenges as an Easter egg for the user
+# Challenges as an Easter egg for the user displayed on the first page
 challenges = [
     "Write down three things you're grateful for today.",
     "Take a five-minute stretch break.",
@@ -530,7 +579,9 @@ challenges = [
 
 # The Main Definition that creates the app pages
 def main():
-    st.image('https://github.com/belikedana/Dana-Schoen-AppDev/blob/main/images/sunrise3.jpeg?raw=true', caption='Have a wonderful day!')
+    # Image with the Image address from GitHub
+    st.image('https://github.com/belikedana/Dana-Schoen-AppDev/blob/main/images/sunrise3.jpeg?raw=true',
+             caption='Have a wonderful day!')
     load_habits()
 
     # Navigation
@@ -538,18 +589,22 @@ def main():
                                     ["Track Morning Routine", "Complete Nightly Survey", "View Insights",
                                      "Community Page", "Reminders"])
 
+    # App Mode of the Tracking Page
     if app_mode == "Track Morning Routine":
         track_morning()
         if st.button("View Consistency"):
             view_morning_routine_consistency()
             view_morning_routine_data()
         st.write("-------------------------------------")
+        # Easter Egg with the Challenge
         if st.button('Show me today\'s challenge!'):
             st.markdown(f"**Today's Challenge:** {random.choice(challenges)}")
 
+    # App Mode of the Nightly Survey
     elif app_mode == "Complete Nightly Survey":
         display_nightly_survey()
 
+    # App Mode of the Insights
     elif app_mode == "View Insights":
         st.header("Your Morning Routine Insights")
 
@@ -568,6 +623,7 @@ def main():
             ["Overview Analysis", "A More Detailed Analysis"]
         )
 
+        # Added a little timer, so it appears like the app needs to retrieve the data first before displaying it
         if option == "Overview Analysis":
             # Create a placeholder for a loading message
             loading_message = st.empty()
@@ -584,6 +640,7 @@ def main():
                 recommendation()
                 st.warning(
                     "**Disclaimer:** The analysis provided by this tool is based on patterns detected by an algorithm, which might reveal insights not immediately apparent. However, it's crucial to stay in tune with your own body and how your morning routine affects your well-being. Trust your judgment and feelings in deciding what's best for you, irrespective of the recommendations.")
+        # More Detailed Analysis that loads the detailed_insights
         elif option == "A More Detailed Analysis":
             # Create a placeholder for a loading message
             loading_message = st.empty()
@@ -594,13 +651,16 @@ def main():
             # Now that the data is (supposedly) loaded, clear the loading message
             loading_message.empty()
             with st.expander("Detailed Analysis:"):
-                detailed_insghts()
+                detailed_insights()
 
+    # App Mode of the Community Page
     elif app_mode == "Community Page":
         community_page()
 
+    # App Mode of the Reminders
     elif app_mode == "Reminders":
         reminders_page()
 
 
+# Call the Main Definition to display the app
 main()
